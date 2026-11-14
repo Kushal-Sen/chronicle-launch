@@ -108,7 +108,8 @@ function show(open){
 }
 function tick(){
   var left = LAUNCH - now();
-  if (left <= 0) { show(true); findPdf(); celebrate(); return; }
+  if (left <= LEAD_MS) celebrate(); // starts 5 seconds before launch
+  if (left <= 0) { show(true); findPdf(); return; }
   show(false);
   var d = Math.floor(left/1000);
   document.getElementById("h").textContent = pad(Math.floor(d/3600));
@@ -116,30 +117,47 @@ function tick(){
   document.getElementById("s").textContent = pad(d%60);
   setTimeout(tick, 250);
 }
-// Celebration: 30 seconds of confetti from the launch moment. Someone who arrives
-// during those 30 seconds sees what is left of it. Skipped for reduced-motion users.
-var CELEBRATE_MS = 30000, celebrating = false;
+// Celebration: confetti starts 5 seconds before launch and runs for 15 seconds in all
+// (so it ends 10 seconds after the flip). Someone who arrives mid-way sees the rest.
+// Pieces land and bounce on the buttons, the QR and the countdown boxes.
+// Skipped for reduced-motion users.
+var LEAD_MS = 5000, CELEBRATE_MS = 15000, celebrating = false;
 function celebrate(){
-  var ran = now() - LAUNCH;
+  var ran = now() - (LAUNCH - LEAD_MS);
   if (celebrating || ran >= CELEBRATE_MS) return;
   if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   celebrating = true;
   var cv = document.getElementById("fx"), cx = cv.getContext("2d"), W, H, dpr = Math.min(window.devicePixelRatio || 1, 2);
   function size(){ W = innerWidth; H = innerHeight; cv.width = W*dpr; cv.height = H*dpr; cx.setTransform(dpr,0,0,dpr,0,0); }
   size(); addEventListener("resize", size);
-  var colors = ["#14284b","#b3262e","#d4a73a","#ffffff","#5b7bb5"], bits = [], start = Date.now(), last = start;
+  var colors = ["#14284b","#b3262e","#d4a73a","#ffffff","#5b7bb5"], bits = [], start = Date.now(), last = start, shelves = [], shelfAt = 0;
+  function getShelves(t){ // things confetti can land on, re-measured a few times a second
+    if (t - shelfAt < 150) return; shelfAt = t; shelves = [];
+    document.querySelectorAll(".btn, .qr img, #count div").forEach(function(e){
+      var r = e.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < H) shelves.push(r);
+    });
+  }
   function spawn(n){
     for (var i=0;i<n;i++) bits.push({x:Math.random()*W, y:-12, vx:(Math.random()-.5)*60, vy:70+Math.random()*130,
-      w:6+Math.random()*6, h:9+Math.random()*8, a:Math.random()*6.28, va:(Math.random()-.5)*8, c:colors[(Math.random()*colors.length)|0]});
+      w:6+Math.random()*6, h:9+Math.random()*8, a:Math.random()*6.28, va:(Math.random()-.5)*8, c:colors[(Math.random()*colors.length)|0], hits:0});
   }
   spawn(120); // opening burst
   (function frame(){
     var t = Date.now(), dt = Math.min((t-last)/1000, .05), el = t - start; last = t;
-    cx.clearRect(0,0,W,H);
-    if (el < CELEBRATE_MS - ran) spawn(Math.round(W/60)); // steady shower until the 30 seconds are up
+    cx.clearRect(0,0,W,H); getShelves(t);
+    if (el < CELEBRATE_MS - ran) spawn(Math.round(W/60)); // steady shower until the time is up
     for (var i=bits.length-1;i>=0;i--){
-      var b = bits[i]; b.x += b.vx*dt; b.y += b.vy*dt; b.a += b.va*dt;
-      if (b.y > H+20) { bits.splice(i,1); continue; }
+      var b = bits[i], py = b.y;
+      b.vy = Math.min(b.vy + 260*dt, 230); // gentle gravity, capped so it floats like confetti
+      b.x += b.vx*dt; b.y += b.vy*dt; b.a += b.va*dt;
+      if (b.hits < 3) for (var k=0;k<shelves.length;k++){
+        var r = shelves[k];
+        if (b.x > r.left && b.x < r.right && b.y > r.top && py <= r.top + 2 && b.y < r.top + 40){
+          b.y = r.top; b.vy = -Math.abs(b.vy)*(.35 + Math.random()*.3) - 30; b.vx += (Math.random()-.5)*90; b.hits++; break;
+        }
+      }
+      if (b.y > H+20 || b.x < -30 || b.x > W+30) { bits.splice(i,1); continue; }
       cx.save(); cx.translate(b.x,b.y); cx.rotate(b.a); cx.fillStyle = b.c; cx.fillRect(-b.w/2,-b.h/2,b.w,b.h); cx.restore();
     }
     if (el < CELEBRATE_MS - ran || bits.length) requestAnimationFrame(frame);
