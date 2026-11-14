@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Men's Rights Chronicle · Inaugural Edition</title>
+<meta name="description" content="The inaugural edition of The Men's Rights Chronicle, from All Bengal Men's Forum. Releases 15 November 2026, 5:00 PM IST.">
+<meta property="og:title" content="The Men's Rights Chronicle · Inaugural Edition">
+<meta property="og:description" content="Justice, dignity, family rights, and community support. Releases 15 November 2026, 5:00 PM IST.">
+<style>
+:root{--navy:#14284b;--red:#b3262e;--paper:#faf7f0;--ink:#1c1c1c;--muted:#5b6270;--line:#ddd6c6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.55 Georgia,"Source Serif 4",serif;min-height:100vh;display:flex;flex-direction:column}
+.strip{background:var(--navy);color:#fff;font:13px/1.4 system-ui,Inter,sans-serif;padding:8px 16px;text-align:center}
+.strip a{color:#fff}
+main{flex:1;width:100%;max-width:640px;margin:0 auto;padding:40px 16px;text-align:center}
+.bar{width:56px;height:5px;background:var(--red);margin:0 auto 20px}
+.kicker{font:600 13px/1 system-ui,Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--red)}
+h1{font-size:clamp(30px,7vw,44px);line-height:1.12;margin:14px 0 8px;color:var(--navy)}
+.tag{color:var(--muted);margin:0 0 28px}
+.when{font:600 16px/1.4 system-ui,Inter,sans-serif;margin:0 0 20px}
+#count{display:flex;gap:10px;justify-content:center;margin:0 0 28px}
+#count div{background:#fff;border:1px solid var(--line);border-radius:8px;min-width:72px;padding:12px 6px}
+#count b{display:block;font:700 30px/1.1 system-ui,Inter,sans-serif;color:var(--navy);font-variant-numeric:tabular-nums}
+#count span{font:12px/1 system-ui,Inter,sans-serif;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.btn{display:inline-block;font:600 16px/1 system-ui,Inter,sans-serif;padding:15px 24px;border-radius:6px;text-decoration:none;border:2px solid var(--navy);margin:4px}
+.btn.primary{background:var(--red);border-color:var(--red);color:#fff}
+.btn.ghost{background:transparent;color:var(--navy)}
+.note{color:var(--muted);font-size:15px}
+.hidden{display:none!important}
+footer{padding:20px 16px 28px;text-align:center;font:13px/1.5 system-ui,Inter,sans-serif;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="strip">All Bengal Men's Forum · In crisis? Call <a href="tel:+916289207039">+91 62892 07039</a> · confidential support</div>
+<main>
+  <div class="bar"></div>
+  <div class="kicker">Inaugural Edition · November 2026</div>
+  <h1>The Men's Rights Chronicle</h1>
+  <p class="tag">Justice, dignity, family rights, and community support.</p>
+
+  <section id="before">
+    <p class="when">Releases today at 5:00 PM IST</p>
+    <div id="count" aria-live="off">
+      <div><b id="h">--</b><span>hours</span></div>
+      <div><b id="m">--</b><span>min</span></div>
+      <div><b id="s">--</b><span>sec</span></div>
+    </div>
+    <p class="note">Keep this page open, or scan the same QR again at 5 PM. It opens by itself.</p>
+  </section>
+
+  <section id="after" class="hidden">
+    <p class="when">The inaugural edition is out.</p>
+    <a class="btn primary" id="read" href="chronicle-2026-11.pdf">Read the edition (PDF)</a>
+    <a class="btn ghost" id="wa" href="#">Share on WhatsApp</a>
+    <p class="note">Free for distribution. Print it, share it, forward it to one person who should see it.</p>
+  </section>
+</main>
+<footer><a href="https://abmfglobal.com">abmfglobal.com</a></footer>
+
+<script>
+// Release moment: 15 Nov 2026, 17:00 India Standard Time (UTC+05:30)
+var LAUNCH = Date.parse("2026-11-15T17:00:00+05:30");
+// Rehearsal only: ?now=2026-11-15T16:59:50+05:30 pretends it is that moment.
+var fake = new URLSearchParams(location.search).get("now");
+var skew = 0; // server time minus device time, so a wrong phone clock cannot open it early or late
+
+function now(){ return fake ? Date.parse(fake) + (Date.now() - t0) : Date.now() + skew; }
+var t0 = Date.now();
+function pad(n){ return String(n).padStart(2,"0"); }
+function show(open){
+  document.getElementById("before").classList.toggle("hidden", open);
+  document.getElementById("after").classList.toggle("hidden", !open);
+}
+function tick(){
+  var left = LAUNCH - now();
+  if (left <= 0) { show(true); return; }
+  show(false);
+  var d = Math.floor(left/1000);
+  document.getElementById("h").textContent = pad(Math.floor(d/3600));
+  document.getElementById("m").textContent = pad(Math.floor(d%3600/60));
+  document.getElementById("s").textContent = pad(d%60);
+  setTimeout(tick, 250);
+}
+var text = "The first edition of The Men's Rights Chronicle is out. Read it, and forward it to one person who should see it: " + location.origin + location.pathname;
+document.getElementById("wa").href = "https://wa.me/?text=" + encodeURIComponent(text);
+
+// Ask the server what time it is, then start.
+fetch(location.pathname, {method:"HEAD", cache:"no-store"}).then(function(r){
+  var h = r.headers.get("Date");
+  if (h) skew = Date.parse(h) - Date.now();
+}).catch(function(){}).then(tick);
+</script>
+</body>
+</html>
