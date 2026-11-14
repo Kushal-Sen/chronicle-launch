@@ -34,11 +34,17 @@ h1{font-size:clamp(30px,7vw,44px);line-height:1.12;margin:14px 0 8px;color:var(-
 .inside{margin:0 0 16px;padding-left:20px}
 .inside li{margin:0 0 6px}
 .sign{font-style:italic;color:var(--muted);margin-top:16px}
-.qr{margin:30px auto 0;text-align:center}
-.qr img{width:170px;height:170px;display:block;margin:0 auto 10px;background:#fff;padding:8px;border:1px solid var(--line);border-radius:8px}
-.qr p{margin:0;font:14px/1.5 system-ui,Inter,sans-serif;color:var(--muted)}
-.qr a{color:var(--navy);word-break:break-all}
-#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.strip,main,footer{position:relative;z-index:1}
+.btn.ghost{background:var(--paper)}
+/* launch moment: the "out now" block rises in, then the Read button glows three times */
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes glow{0%{box-shadow:0 0 0 0 rgba(179,38,46,.55)}70%{box-shadow:0 0 0 16px rgba(179,38,46,0)}100%{box-shadow:0 0 0 0 rgba(179,38,46,0)}}
+@keyframes sweep{from{width:56px}50%{width:180px}to{width:56px}}
+.launching #after{animation:rise .7s ease-out both}
+.launching #read{animation:glow 1.6s ease-out .8s 3}
+.launching .bar{animation:sweep 1.8s ease-in-out 2;background:linear-gradient(90deg,var(--red),#d4a73a,var(--red))}
+@media (prefers-reduced-motion: reduce){.launching #after,.launching #read,.launching .bar{animation:none}}
 .hidden{display:none!important}
 footer{padding:20px 16px 28px;text-align:center;font:13px/1.5 system-ui,Inter,sans-serif;color:var(--muted)}
 </style>
@@ -67,10 +73,6 @@ footer{padding:20px 16px 28px;text-align:center;font:13px/1.5 system-ui,Inter,sa
     <p class="note" id="wait">Opening the edition… one moment.</p>
     <a class="btn ghost" id="wa" href="#">Share on WhatsApp</a>
     <p class="note">Free for distribution. Print it, share it, forward it to one person who should see it.</p>
-  </section>
-  <section class="qr">
-    <img src="qr.svg" alt="QR code for this page" width="170" height="170">
-    <p>Scan to open this page, or share the link:<br><a href="https://abmfglobal.github.io/chronicle-launch/">abmfglobal.github.io/chronicle-launch</a></p>
   </section>
   <section class="invite">
     <h2>You are invited to the inaugural edition</h2>
@@ -109,7 +111,10 @@ function show(open){
 function tick(){
   var left = LAUNCH - now();
   if (left <= LEAD_MS) celebrate(); // starts 5 seconds before launch
-  if (left <= 0) { show(true); findPdf(); return; }
+  if (left <= 0) {
+    if (inWindow()) document.body.classList.add("launching");
+    show(true); findPdf(); return;
+  }
   show(false);
   var d = Math.floor(left/1000);
   document.getElementById("h").textContent = pad(Math.floor(d/3600));
@@ -117,11 +122,12 @@ function tick(){
   document.getElementById("s").textContent = pad(d%60);
   setTimeout(tick, 250);
 }
-// Celebration: confetti starts 5 seconds before launch and runs for 15 seconds in all
-// (so it ends 10 seconds after the flip). Someone who arrives mid-way sees the rest.
-// Pieces land and bounce on the buttons, the QR and the countdown boxes.
-// Skipped for reduced-motion users.
+// Celebration: from 5 seconds before launch, for 15 seconds in all. Confetti falls
+// BEHIND the page content, so it never covers the text or the buttons. At the flip the
+// "out now" block rises in and the Read button glows (see .launching in the CSS).
+// Someone who arrives mid-way sees the rest. Reduced-motion users get none of it.
 var LEAD_MS = 5000, CELEBRATE_MS = 15000, celebrating = false;
+function inWindow(){ var r = now() - (LAUNCH - LEAD_MS); return r >= 0 && r < CELEBRATE_MS; }
 function celebrate(){
   var ran = now() - (LAUNCH - LEAD_MS);
   if (celebrating || ran >= CELEBRATE_MS) return;
@@ -130,35 +136,20 @@ function celebrate(){
   var cv = document.getElementById("fx"), cx = cv.getContext("2d"), W, H, dpr = Math.min(window.devicePixelRatio || 1, 2);
   function size(){ W = innerWidth; H = innerHeight; cv.width = W*dpr; cv.height = H*dpr; cx.setTransform(dpr,0,0,dpr,0,0); }
   size(); addEventListener("resize", size);
-  var colors = ["#14284b","#b3262e","#d4a73a","#ffffff","#5b7bb5"], bits = [], start = Date.now(), last = start, shelves = [], shelfAt = 0;
-  function getShelves(t){ // things confetti can land on, re-measured a few times a second
-    if (t - shelfAt < 150) return; shelfAt = t; shelves = [];
-    document.querySelectorAll(".btn, .qr img, #count div").forEach(function(e){
-      var r = e.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < H) shelves.push(r);
-    });
-  }
+  var colors = ["#14284b","#b3262e","#d4a73a","#5b7bb5"], bits = [], start = Date.now(), last = start;
   function spawn(n){
-    for (var i=0;i<n;i++) bits.push({x:Math.random()*W, y:-12, vx:(Math.random()-.5)*60, vy:70+Math.random()*130,
-      w:6+Math.random()*6, h:9+Math.random()*8, a:Math.random()*6.28, va:(Math.random()-.5)*8, c:colors[(Math.random()*colors.length)|0], hits:0});
+    for (var i=0;i<n;i++) bits.push({x:Math.random()*W, y:-12, vx:(Math.random()-.5)*50, vy:80+Math.random()*120,
+      w:5+Math.random()*5, h:8+Math.random()*7, a:Math.random()*6.28, va:(Math.random()-.5)*7, c:colors[(Math.random()*colors.length)|0]});
   }
-  spawn(120); // opening burst
+  spawn(70);
   (function frame(){
     var t = Date.now(), dt = Math.min((t-last)/1000, .05), el = t - start; last = t;
-    cx.clearRect(0,0,W,H); getShelves(t);
-    if (el < CELEBRATE_MS - ran) spawn(Math.round(W/60)); // steady shower until the time is up
+    cx.clearRect(0,0,W,H);
+    if (el < CELEBRATE_MS - ran && Math.random() < .6) spawn(Math.max(1, Math.round(W/120)));
     for (var i=bits.length-1;i>=0;i--){
-      var b = bits[i], py = b.y;
-      b.vy = Math.min(b.vy + 260*dt, 230); // gentle gravity, capped so it floats like confetti
-      b.x += b.vx*dt; b.y += b.vy*dt; b.a += b.va*dt;
-      if (b.hits < 3) for (var k=0;k<shelves.length;k++){
-        var r = shelves[k];
-        if (b.x > r.left && b.x < r.right && b.y > r.top && py <= r.top + 2 && b.y < r.top + 40){
-          b.y = r.top; b.vy = -Math.abs(b.vy)*(.35 + Math.random()*.3) - 30; b.vx += (Math.random()-.5)*90; b.hits++; break;
-        }
-      }
-      if (b.y > H+20 || b.x < -30 || b.x > W+30) { bits.splice(i,1); continue; }
-      cx.save(); cx.translate(b.x,b.y); cx.rotate(b.a); cx.fillStyle = b.c; cx.fillRect(-b.w/2,-b.h/2,b.w,b.h); cx.restore();
+      var b = bits[i]; b.x += b.vx*dt; b.y += b.vy*dt; b.a += b.va*dt;
+      if (b.y > H+20) { bits.splice(i,1); continue; }
+      cx.save(); cx.globalAlpha = .8; cx.translate(b.x,b.y); cx.rotate(b.a); cx.fillStyle = b.c; cx.fillRect(-b.w/2,-b.h/2,b.w,b.h); cx.restore();
     }
     if (el < CELEBRATE_MS - ran || bits.length) requestAnimationFrame(frame);
     else { cx.clearRect(0,0,W,H); removeEventListener("resize", size); celebrating = false; }
