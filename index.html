@@ -38,6 +38,7 @@ h1{font-size:clamp(30px,7vw,44px);line-height:1.12;margin:14px 0 8px;color:var(-
 .qr img{width:170px;height:170px;display:block;margin:0 auto 10px;background:#fff;padding:8px;border:1px solid var(--line);border-radius:8px}
 .qr p{margin:0;font:14px/1.5 system-ui,Inter,sans-serif;color:var(--muted)}
 .qr a{color:var(--navy);word-break:break-all}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50}
 .hidden{display:none!important}
 footer{padding:20px 16px 28px;text-align:center;font:13px/1.5 system-ui,Inter,sans-serif;color:var(--muted)}
 </style>
@@ -89,6 +90,7 @@ footer{padding:20px 16px 28px;text-align:center;font:13px/1.5 system-ui,Inter,sa
 </main>
 <footer><a href="https://abmfglobal.com">abmfglobal.com</a></footer>
 
+<canvas id="fx" aria-hidden="true"></canvas>
 <script>
 // Release moment: 15 Nov 2026, 20:00 India Standard Time (UTC+05:30)
 var LAUNCH = Date.parse("2026-11-15T20:00:00+05:30");
@@ -106,7 +108,7 @@ function show(open){
 }
 function tick(){
   var left = LAUNCH - now();
-  if (left <= 0) { show(true); findPdf(); return; }
+  if (left <= 0) { show(true); findPdf(); celebrate(); return; }
   show(false);
   var d = Math.floor(left/1000);
   document.getElementById("h").textContent = pad(Math.floor(d/3600));
@@ -114,6 +116,37 @@ function tick(){
   document.getElementById("s").textContent = pad(d%60);
   setTimeout(tick, 250);
 }
+// Celebration: 30 seconds of confetti from the launch moment. Someone who arrives
+// during those 30 seconds sees what is left of it. Skipped for reduced-motion users.
+var CELEBRATE_MS = 30000, celebrating = false;
+function celebrate(){
+  var ran = now() - LAUNCH;
+  if (celebrating || ran >= CELEBRATE_MS) return;
+  if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  celebrating = true;
+  var cv = document.getElementById("fx"), cx = cv.getContext("2d"), W, H, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  function size(){ W = innerWidth; H = innerHeight; cv.width = W*dpr; cv.height = H*dpr; cx.setTransform(dpr,0,0,dpr,0,0); }
+  size(); addEventListener("resize", size);
+  var colors = ["#14284b","#b3262e","#d4a73a","#ffffff","#5b7bb5"], bits = [], start = Date.now(), last = start;
+  function spawn(n){
+    for (var i=0;i<n;i++) bits.push({x:Math.random()*W, y:-12, vx:(Math.random()-.5)*60, vy:70+Math.random()*130,
+      w:6+Math.random()*6, h:9+Math.random()*8, a:Math.random()*6.28, va:(Math.random()-.5)*8, c:colors[(Math.random()*colors.length)|0]});
+  }
+  spawn(120); // opening burst
+  (function frame(){
+    var t = Date.now(), dt = Math.min((t-last)/1000, .05), el = t - start; last = t;
+    cx.clearRect(0,0,W,H);
+    if (el < CELEBRATE_MS - ran) spawn(Math.round(W/60)); // steady shower until the 30 seconds are up
+    for (var i=bits.length-1;i>=0;i--){
+      var b = bits[i]; b.x += b.vx*dt; b.y += b.vy*dt; b.a += b.va*dt;
+      if (b.y > H+20) { bits.splice(i,1); continue; }
+      cx.save(); cx.translate(b.x,b.y); cx.rotate(b.a); cx.fillStyle = b.c; cx.fillRect(-b.w/2,-b.h/2,b.w,b.h); cx.restore();
+    }
+    if (el < CELEBRATE_MS - ran || bits.length) requestAnimationFrame(frame);
+    else { cx.clearRect(0,0,W,H); removeEventListener("resize", size); celebrating = false; }
+  })();
+}
+
 // The PDF is uploaded at release time. Show the button only once it really exists.
 function findPdf(){
   fetch("chronicle-2026-11.pdf", {method:"HEAD", cache:"no-store"}).then(function(r){
