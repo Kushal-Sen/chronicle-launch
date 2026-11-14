@@ -86,6 +86,7 @@ footer{padding:20px 16px 28px;text-align:center;font:13px/1.5 system-ui,Inter,sa
 var LAUNCH = Date.parse("2026-11-15T17:00:00+05:30");
 // Rehearsal only: ?now=2026-11-15T16:59:50+05:30 pretends it is that moment.
 var fake = new URLSearchParams(location.search).get("now");
+if (fake) { fake = fake.replace(" ", "+"); if (isNaN(Date.parse(fake))) fake = null; } // a raw "+" in a link arrives as a space
 var skew = 0; // server time minus device time, so a wrong phone clock cannot open it early or late
 
 function now(){ return fake ? Date.parse(fake) + (Date.now() - t0) : Date.now() + skew; }
