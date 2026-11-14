@@ -40,11 +40,9 @@ h1{font-size:clamp(30px,7vw,44px);line-height:1.12;margin:14px 0 8px;color:var(-
 /* launch moment: the "out now" block rises in, then the Read button glows three times */
 @keyframes rise{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes glow{0%{box-shadow:0 0 0 0 rgba(179,38,46,.55)}70%{box-shadow:0 0 0 16px rgba(179,38,46,0)}100%{box-shadow:0 0 0 0 rgba(179,38,46,0)}}
-@keyframes sweep{from{width:56px}50%{width:180px}to{width:56px}}
 .launching #after{animation:rise .7s ease-out both}
 .launching #read{animation:glow 1.6s ease-out .8s 3}
-.launching .bar{animation:sweep 1.8s ease-in-out 2;background:linear-gradient(90deg,var(--red),#d4a73a,var(--red))}
-@media (prefers-reduced-motion: reduce){.launching #after,.launching #read,.launching .bar{animation:none}}
+@media (prefers-reduced-motion: reduce){.launching #after,.launching #read{animation:none}}
 .hidden{display:none!important}
 footer{padding:20px 16px 28px;text-align:center;font:13px/1.5 system-ui,Inter,sans-serif;color:var(--muted)}
 </style>
@@ -122,12 +120,30 @@ function tick(){
   document.getElementById("s").textContent = pad(d%60);
   setTimeout(tick, 250);
 }
-// Celebration: from 5 seconds before launch, for 15 seconds in all. Confetti falls
-// BEHIND the page content, so it never covers the text or the buttons. At the flip the
-// "out now" block rises in and the Read button glows (see .launching in the CSS).
-// Someone who arrives mid-way sees the rest. Reduced-motion users get none of it.
+// Celebration: fireworks from 5 seconds before launch, for 15 seconds in all.
+// Each one bursts in an empty part of the screen (away from the text, buttons and card),
+// one at a time, with a slow fade. Drawn behind the content. Someone who arrives
+// mid-way sees the rest. Reduced-motion users get none of it.
 var LEAD_MS = 5000, CELEBRATE_MS = 15000, celebrating = false;
 function inWindow(){ var r = now() - (LAUNCH - LEAD_MS); return r >= 0 && r < CELEBRATE_MS; }
+function busyRects(){ // where the content actually is: the text itself, not the full-width blocks
+  var out = [];
+  document.querySelectorAll(".strip,.bar,.kicker,h1,.tag,.when,.note,#count div,.btn,.invite,footer a").forEach(function(e){
+    var r;
+    if (e.matches(".kicker,h1,.tag,.when,.note,footer a")) { var g = document.createRange(); g.selectNodeContents(e); r = g.getBoundingClientRect(); }
+    else r = e.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) out.push(r);
+  });
+  return out;
+}
+function roomAt(x, y, rects){ // distance from (x,y) to the nearest piece of content
+  var d = Infinity;
+  rects.forEach(function(r){
+    var dx = Math.max(r.left - x, 0, x - r.right), dy = Math.max(r.top - y, 0, y - r.bottom);
+    d = Math.min(d, Math.sqrt(dx*dx + dy*dy));
+  });
+  return d;
+}
 function celebrate(){
   var ran = now() - (LAUNCH - LEAD_MS);
   if (celebrating || ran >= CELEBRATE_MS) return;
@@ -136,22 +152,41 @@ function celebrate(){
   var cv = document.getElementById("fx"), cx = cv.getContext("2d"), W, H, dpr = Math.min(window.devicePixelRatio || 1, 2);
   function size(){ W = innerWidth; H = innerHeight; cv.width = W*dpr; cv.height = H*dpr; cx.setTransform(dpr,0,0,dpr,0,0); }
   size(); addEventListener("resize", size);
-  var colors = ["#14284b","#b3262e","#d4a73a","#5b7bb5"], bits = [], start = Date.now(), last = start;
-  function spawn(n){
-    for (var i=0;i<n;i++) bits.push({x:Math.random()*W, y:-12, vx:(Math.random()-.5)*50, vy:80+Math.random()*120,
-      w:5+Math.random()*5, h:8+Math.random()*7, a:Math.random()*6.28, va:(Math.random()-.5)*7, c:colors[(Math.random()*colors.length)|0]});
+  var colors = ["#b3262e","#d4a73a","#14284b","#5b7bb5"], rockets = [], sparks = [], start = Date.now(), last = start, nextAt = 0;
+  function launch(){
+    var rects = busyRects(), best = null;
+    for (var i=0;i<60;i++){ // look for the emptiest spot in the upper two-thirds
+      var x = 30 + Math.random()*(W-60), y = 40 + Math.random()*(H*.66), room = roomAt(x, y, rects);
+      if (!best || room > best.room) best = {x:x, y:y, room:room};
+    }
+    if (!best || best.room < 28) return; // nowhere quiet enough right now: skip this one
+    rockets.push({x:best.x, y:H+10, tx:best.x, ty:best.y, r:Math.min(best.room, 110), c:colors[(Math.random()*colors.length)|0]});
   }
-  spawn(70);
+  function burst(k){
+    var n = 34;
+    for (var i=0;i<n;i++){
+      var ang = i/n*6.283 + Math.random()*.2, sp = k.r*(1.6 + Math.random()*.5);
+      sparks.push({x:k.tx, y:k.ty, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp, life:1, c:Math.random()<.25 ? "#d4a73a" : k.c});
+    }
+  }
   (function frame(){
     var t = Date.now(), dt = Math.min((t-last)/1000, .05), el = t - start; last = t;
     cx.clearRect(0,0,W,H);
-    if (el < CELEBRATE_MS - ran && Math.random() < .6) spawn(Math.max(1, Math.round(W/120)));
-    for (var i=bits.length-1;i>=0;i--){
-      var b = bits[i]; b.x += b.vx*dt; b.y += b.vy*dt; b.a += b.va*dt;
-      if (b.y > H+20) { bits.splice(i,1); continue; }
-      cx.save(); cx.globalAlpha = .8; cx.translate(b.x,b.y); cx.rotate(b.a); cx.fillStyle = b.c; cx.fillRect(-b.w/2,-b.h/2,b.w,b.h); cx.restore();
+    if (el < CELEBRATE_MS - ran - 1500 && el >= nextAt) { launch(); nextAt = el + 900 + Math.random()*600; }
+    for (var i=rockets.length-1;i>=0;i--){
+      var k = rockets[i]; k.y -= Math.max(260, (k.y - k.ty)*3)*dt;
+      cx.globalAlpha = .7; cx.fillStyle = "#d4a73a"; cx.beginPath(); cx.arc(k.x, k.y, 2, 0, 6.283); cx.fill();
+      if (k.y <= k.ty) { burst(k); rockets.splice(i,1); }
     }
-    if (el < CELEBRATE_MS - ran || bits.length) requestAnimationFrame(frame);
+    for (var j=sparks.length-1;j>=0;j--){
+      var p = sparks[j];
+      p.vx *= 1 - 2.2*dt; p.vy = p.vy*(1 - 2.2*dt) + 40*dt; // slow down, drift down gently
+      p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt/1.4;
+      if (p.life <= 0) { sparks.splice(j,1); continue; }
+      cx.globalAlpha = p.life*.85; cx.fillStyle = p.c; cx.beginPath(); cx.arc(p.x, p.y, 2.2, 0, 6.283); cx.fill();
+    }
+    cx.globalAlpha = 1;
+    if (el < CELEBRATE_MS - ran || rockets.length || sparks.length) requestAnimationFrame(frame);
     else { cx.clearRect(0,0,W,H); removeEventListener("resize", size); celebrating = false; }
   })();
 }
