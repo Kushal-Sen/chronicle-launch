@@ -51,7 +51,8 @@ footer{padding:20px 16px 28px;text-align:center;font:13px/1.5 system-ui,Inter,sa
 
   <section id="after" class="hidden">
     <p class="when">The inaugural edition is out.</p>
-    <a class="btn primary" id="read" href="chronicle-2026-11.pdf">Read the edition (PDF)</a>
+    <a class="btn primary hidden" id="read" href="chronicle-2026-11.pdf">Read the edition (PDF)</a>
+    <p class="note" id="wait">Opening the edition… one moment.</p>
     <a class="btn ghost" id="wa" href="#">Share on WhatsApp</a>
     <p class="note">Free for distribution. Print it, share it, forward it to one person who should see it.</p>
   </section>
@@ -74,13 +75,20 @@ function show(open){
 }
 function tick(){
   var left = LAUNCH - now();
-  if (left <= 0) { show(true); return; }
+  if (left <= 0) { show(true); findPdf(); return; }
   show(false);
   var d = Math.floor(left/1000);
   document.getElementById("h").textContent = pad(Math.floor(d/3600));
   document.getElementById("m").textContent = pad(Math.floor(d%3600/60));
   document.getElementById("s").textContent = pad(d%60);
   setTimeout(tick, 250);
+}
+// The PDF is uploaded at release time. Show the button only once it really exists.
+function findPdf(){
+  fetch("chronicle-2026-11.pdf", {method:"HEAD", cache:"no-store"}).then(function(r){
+    if (r.ok) { document.getElementById("read").classList.remove("hidden"); document.getElementById("wait").classList.add("hidden"); }
+    else setTimeout(findPdf, 8000);
+  }).catch(function(){ setTimeout(findPdf, 8000); });
 }
 var text = "The first edition of The Men's Rights Chronicle is out. Read it, and forward it to one person who should see it: " + location.origin + location.pathname;
 document.getElementById("wa").href = "https://wa.me/?text=" + encodeURIComponent(text);
